@@ -1,0 +1,20 @@
+# MIME Types untuk EPUB
+AddType application/epub+zip .epub
+
+# Enable CORS untuk local development
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# Cache EPUB files untuk performa
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType application/epub+zip "access plus 1 hour"
+</IfModule>
+
+# Compress EPUB (already compressed but just in case)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE application/epub+zip
+</IfModule>
