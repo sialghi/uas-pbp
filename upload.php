@@ -9,17 +9,17 @@ if (isset($_POST['upload'])) {
     $penulis = $_POST['penulis'];
     $kategori = $_POST['kategori'];
 
-    // --- LOGIKA AUTO COVER ---
+  
     if (empty($_FILES['cover']['name'])) {
-        // Jika user tidak upload cover, pakai default
+    
         $coverName = 'default_book.png'; 
     } else {
-        // Jika user upload cover
+        
         $coverName = time() . '_' . $_FILES['cover']['name'];
         move_uploaded_file($_FILES['cover']['tmp_name'], 'uploads/covers/' . $coverName);
     }
 
-    // Upload Epub (Wajib)
+
     $epubName = time() . '_' . $_FILES['epub']['name'];
     $epubTmp = $_FILES['epub']['tmp_name'];
     $epubExt = strtolower(pathinfo($epubName, PATHINFO_EXTENSION));
@@ -30,7 +30,7 @@ if (isset($_POST['upload'])) {
         $query = "INSERT INTO books (judul, penulis, kategori, cover, file_path) VALUES ('$judul', '$penulis', '$kategori', '$coverName', '$epubName')";
         
         if(mysqli_query($conn, $query)){
-            header("Location: dashboard.php"); // Redirect sukses
+            header("Location: dashboard.php"); 
         } else {
             echo "<script>alert('".t('error_upload')."');</script>";
         }

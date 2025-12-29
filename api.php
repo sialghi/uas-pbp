@@ -25,6 +25,35 @@ if (!isset($_SESSION['login'])) {
 $user_id = intval($_SESSION['user_id'] ?? 0);
 $action = $_POST['action'] ?? '';
 
+function ensure_bookmarks_table($conn) {
+    $sql = "CREATE TABLE IF NOT EXISTS bookmarks (\n"
+         . "  id INT(11) NOT NULL AUTO_INCREMENT,\n"
+         . "  user_id INT(11) DEFAULT NULL,\n"
+         . "  book_id INT(11) DEFAULT NULL,\n"
+         . "  cfi_range VARCHAR(255) DEFAULT NULL,\n"
+         . "  label VARCHAR(255) DEFAULT NULL,\n"
+         . "  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+         . "  PRIMARY KEY (id),\n"
+         . "  KEY idx_user_book (user_id, book_id)\n"
+         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+    mysqli_query($conn, $sql);
+}
+
+function ensure_notes_table($conn) {
+    $sql = "CREATE TABLE IF NOT EXISTS notes (\n"
+         . "  id INT(11) NOT NULL AUTO_INCREMENT,\n"
+         . "  user_id INT(11) DEFAULT NULL,\n"
+         . "  book_id INT(11) DEFAULT NULL,\n"
+         . "  cfi_range VARCHAR(255) DEFAULT NULL,\n"
+         . "  color VARCHAR(20) DEFAULT 'yellow',\n"
+         . "  note_text TEXT DEFAULT NULL,\n"
+         . "  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+         . "  PRIMARY KEY (id),\n"
+         . "  KEY idx_user_book (user_id, book_id)\n"
+         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+    mysqli_query($conn, $sql);
+}
+
 function ensure_reading_progress_table($conn) {
     // Create table if missing (prevents timer reset when table wasn't migrated)
     $sql = "CREATE TABLE IF NOT EXISTS reading_progress (\n"
@@ -95,23 +124,81 @@ if ($action == 'update_time') {
 
 // 2. Simpan Bookmark
 if ($action == 'save_bookmark') {
-    $book_id = $_POST['book_id'];
-    $cfi = $_POST['cfi'];
-    $label = $_POST['label'];
-    
+    ensure_bookmarks_table($conn);
+
+    $book_id = intval($_POST['book_id'] ?? 0);
+    $cfi = mysqli_real_escape_string($conn, strval($_POST['cfi'] ?? ''));
+    $label = mysqli_real_escape_string($conn, strval($_POST['label'] ?? ''));
+
+    if ($book_id <= 0 || $cfi === '') {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid payload']);
+        exit;
+    }
+
     $query = "INSERT INTO bookmarks (user_id, book_id, cfi_range, label) VALUES ($user_id, $book_id, '$cfi', '$label')";
-    mysqli_query($conn, $query);
-    echo json_encode(['status' => 'success']);
+    $ok = mysqli_query($conn, $query);
+
+    echo json_encode(['status' => $ok ? 'success' : 'error']);
+    exit;
 }
 
 // 3. Simpan Catatan/Highlight
 if ($action == 'save_note') {
-    $book_id = $_POST['book_id'];
-    $cfi = $_POST['cfi'];
-    $text = $_POST['text'];
-    
-    $query = "INSERT INTO notes (user_id, book_id, cfi_range, note_text) VALUES ($user_id, $book_id, '$cfi', '$text')";
-    mysqli_query($conn, $query);
-    echo json_encode(['status' => 'success']);
+    ensure_notes_table($conn);
+
+    $book_id = intval($_POST['book_id'] ?? 0);
+    $cfi = mysqli_real_escape_string($conn, strval($_POST['cfi'] ?? ''));
+    $text = mysqli_real_escape_string($conn, strval($_POST['text'] ?? ''));
+    $color = mysqli_real_escape_string($conn, strval($_POST['color'] ?? 'yellow'));
+
+    if ($book_id <= 0 || $cfi === '') {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid payload']);
+        exit;
+    }
+
+    $query = "INSERT INTO notes (user_id, book_id, cfi_range, color, note_text) VALUES ($user_id, $book_id, '$cfi', '$color', '$text')";
+    $ok = mysqli_query($conn, $query);
+    echo json_encode(['status' => $ok ? 'success' : 'error']);
+    exit;
+}
+
+// 4. Ambil Bookmark (per user + per buku)
+if ($action == 'list_bookmarks') {
+    ensure_bookmarks_table($conn);
+    $book_id = intval($_POST['book_id'] ?? 0);
+    if ($book_id <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid book_id']);
+        exit;
+    }
+
+    $rows = [];
+    $result = mysqli_query($conn, "SELECT id, cfi_range, label, created_at FROM bookmarks WHERE user_id = $user_id AND book_id = $book_id ORDER BY created_at DESC, id DESC");
+    if ($result !== false) {
+        while ($r = mysqli_fetch_assoc($result)) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode(['status' => 'success', 'bookmarks' => $rows]);
+    exit;
+}
+
+// 5. Ambil Highlights/Notes (per user + per buku)
+if ($action == 'list_notes') {
+    ensure_notes_table($conn);
+    $book_id = intval($_POST['book_id'] ?? 0);
+    if ($book_id <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid book_id']);
+        exit;
+    }
+
+    $rows = [];
+    $result = mysqli_query($conn, "SELECT id, cfi_range, color, note_text, created_at FROM notes WHERE user_id = $user_id AND book_id = $book_id ORDER BY created_at DESC, id DESC");
+    if ($result !== false) {
+        while ($r = mysqli_fetch_assoc($result)) {
+            $rows[] = $r;
+        }
+    }
+    echo json_encode(['status' => 'success', 'notes' => $rows]);
+    exit;
 }
 ?>
